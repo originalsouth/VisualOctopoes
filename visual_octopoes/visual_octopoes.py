@@ -1,8 +1,9 @@
 import json
+import urllib.parse
 from itertools import chain
 
 import dash_cytoscape as cyto
-from dash import Dash, html
+from dash import Dash, dcc, html, no_update
 from dash.dependencies import Input, Output
 from xtdb_client import XTDBClient
 
@@ -11,33 +12,36 @@ cyto.load_extra_layouts()
 
 class XTDBSession:
     def __init__(selfless, xtdb_node: str):
-        selfless.node = xtdb_node
-        selfless.connect(selfless.node)
+        selfless.connect(xtdb_node)
 
     def connect(selfless, xtdb_node: str):
+        selfless.node = xtdb_node
         selfless.client = XTDBClient("http://localhost:3000", xtdb_node, 7200)
 
     @property
-    def oois(selfless):
-        return list(
+    def nodes(selfless):
+        oois = list(
             chain.from_iterable(
-                selfless.client.query("{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}")
+                selfless.client.query(
+                    "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}"
+                )
             )
         )
+        return [
+            {"data": {"id": ooi["xt/id"], "label": ooi["object_type"], "info": ooi}}
+            for ooi in oois
+        ]
 
     @property
-    def origins(selfless):
-        return list(
+    def edges(selfless):
+        origins = list(
             chain.from_iterable(
                 selfless.client.query(
                     '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}'
                 )
             )
         )
-
-    @property
-    def connectors(selfless):
-        return list(
+        connectors = list(
             chain.from_iterable(
                 [
                     zip(
@@ -46,38 +50,26 @@ class XTDBSession:
                         [origin] * len(origin["result"]),
                         [origin["origin_type"]] * len(origin["result"]),
                     )
-                    for origin in selfless.origins
+                    for origin in origins
                     if len(origin["result"]) > 0
                 ]
             )
         )
-
-    @property
-    def nodes(selfless):
-        return [
-            {"data": {"id": ooi["xt/id"], "label": ooi["object_type"], "info": ooi}}
-            for ooi in selfless.oois
-        ]
-
-    @property
-    def edges(selfless):
         return [
             {"data": {"source": source, "target": target, "info": info, "kind": kind}}
-            for source, target, info, kind in selfless.connectors
+            for source, target, info, kind in connectors
         ]
 
 
 app = Dash(__name__)
 
 session = XTDBSession("0")
+base_elements = session.nodes + session.edges
 
 default_stylesheet = [
     {
         "selector": "node",
-        "style": {
-            "background-color": "#BFD7B5",
-            "label": "data(label)"
-        },
+        "style": {"background-color": "#BFD7B5", "label": "data(label)"},
     },
     {
         "selector": "edge",
@@ -94,6 +86,11 @@ default_stylesheet = [
 
 app.layout = html.Div(
     [
+        dcc.Interval(
+            id="updater",
+            interval=2000,
+        ),
+        dcc.Location(id="url", refresh=False),
         cyto.Cytoscape(
             id="cytoscape",
             layout={
@@ -101,7 +98,7 @@ app.layout = html.Div(
                 "nodeDimensionsIncludeLabels": True,
                 "rankSep": 500,
             },
-            elements=session.nodes + session.edges,
+            elements=base_elements,
             stylesheet=default_stylesheet,
             style={"width": "100%", "height": "100vh", "z-index": "0"},
         ),
@@ -122,6 +119,25 @@ app.layout = html.Div(
         ),
     ]
 )
+
+
+@app.callback(
+    Output("cytoscape", "elements"),
+    Input("updater", "n_intervals"),
+    Input("url", "search"),
+)
+def update_graph(_, search):
+    params = urllib.parse.parse_qs(search.lstrip("?"))
+    xtdb_node = params.get("node", "0")[0]
+    if xtdb_node != session.node:
+        session.connect(xtdb_node)
+    global base_elements
+    new_elements = session.nodes + session.edges
+    if [element for element in new_elements if element not in base_elements]:
+        base_elements = new_elements
+        return new_elements
+    else:
+        return no_update
 
 
 @app.callback(
