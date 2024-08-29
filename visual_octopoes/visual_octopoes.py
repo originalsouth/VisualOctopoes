@@ -10,6 +10,11 @@ from xtdb_client import XTDBClient
 cyto.load_extra_layouts()
 
 
+def colorize(a: str) -> str:
+    h = hash(a)
+    return f"#{(h & 0xFF0000) >> 16:02x}{(h & 0x00FF00) >> 8:02x}{(h & 0x0000FF):02x}"
+
+
 class XTDBSession:
     def __init__(selfless, xtdb_node: str):
         selfless.connect(xtdb_node)
@@ -28,7 +33,10 @@ class XTDBSession:
             )
         )
         return [
-            {"data": {"id": ooi["xt/id"], "label": ooi["object_type"], "info": ooi}}
+            {
+                "data": {"id": ooi["xt/id"], "label": ooi["object_type"], "info": ooi},
+                "style": {"background-color": colorize(ooi["object_type"])},
+            }
             for ooi in oois
         ]
 
@@ -56,7 +64,18 @@ class XTDBSession:
             )
         )
         return [
-            {"data": {"source": source, "target": target, "info": info, "kind": kind}}
+            {
+                "data": {
+                    "source": source,
+                    "target": target,
+                    "info": info,
+                    "kind": kind,
+                },
+                "style": {
+                    "line-color": colorize(kind),
+                    "target-arrow-color": colorize(kind),
+                },
+            }
             for source, target, info, kind in connectors
         ]
 
@@ -65,6 +84,7 @@ app = Dash(__name__)
 
 session = XTDBSession("0")
 base_elements = session.nodes + session.edges
+
 
 default_stylesheet = [
     {
