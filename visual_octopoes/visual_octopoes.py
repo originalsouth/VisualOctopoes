@@ -1,5 +1,5 @@
+import hashlib
 import json
-import os
 import urllib.parse
 from itertools import chain
 
@@ -9,11 +9,11 @@ from dash.dependencies import Input, Output
 from xtdb_client import XTDBClient
 
 cyto.load_extra_layouts()
-os.environ["PYTHONHASHSEED"] = "2084"
 
 
 def colorize(a: str) -> str:
-    h = hash(a)
+    seed = "137"
+    h = int(hashlib.sha512((seed + a + seed).encode()).hexdigest(), 16)
     return f"#{(h & 0xFF0000) >> 16:02x}{(h & 0x00FF00) >> 8:02x}{(h & 0x0000FF):02x}"
 
 
