@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.parse
 from itertools import chain
 
@@ -8,6 +9,7 @@ from dash.dependencies import Input, Output
 from xtdb_client import XTDBClient
 
 cyto.load_extra_layouts()
+os.environ["PYTHONHASHSEED"] = "2084"
 
 
 def colorize(a: str) -> str:
@@ -108,7 +110,7 @@ app.layout = html.Div(
     [
         dcc.Interval(
             id="updater",
-            interval=2000,
+            interval=1913,
         ),
         dcc.Location(id="url", refresh=False),
         cyto.Cytoscape(
@@ -120,7 +122,14 @@ app.layout = html.Div(
             },
             elements=base_elements,
             stylesheet=default_stylesheet,
-            style={"width": "100%", "height": "100vh", "z-index": "0"},
+            style={
+                "width": "100%",
+                "height": "100vh",
+                "z-index": "0",
+            },
+            zoom=1.0,
+            minZoom=60.0**-1,
+            maxZoom=60.0,
         ),
         html.Pre(
             id="info",
