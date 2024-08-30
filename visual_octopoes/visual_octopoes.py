@@ -193,7 +193,6 @@ def update_graph(_, search, value):
             new_time = datetime.now()
         if session.valid_time != new_time:
             session.valid_time = new_time
-    print(session.valid_time)
     params = urllib.parse.parse_qs(search.lstrip("?"))
     xtdb_node = params.get("node", "0")[0]
     if xtdb_node != session.node:
