@@ -1,6 +1,7 @@
 import hashlib
 import json
 import urllib.parse
+from datetime import datetime
 from itertools import chain
 
 import dash_cytoscape as cyto
@@ -20,17 +21,19 @@ def colorize(a: str) -> str:
 class XTDBSession:
     def __init__(selfless, xtdb_node: str):
         selfless.connect(xtdb_node)
+        selfless.valid_time: datetime = datetime.now()
 
     def connect(selfless, xtdb_node: str):
-        selfless.node = xtdb_node
-        selfless.client = XTDBClient("http://localhost:3000", xtdb_node, 7200)
+        selfless.node: str = xtdb_node
+        selfless.client: XTDBClient = XTDBClient("http://localhost:3000", xtdb_node, 7200)
 
     @property
     def nodes(selfless):
         oois = list(
             chain.from_iterable(
                 selfless.client.query(
-                    "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}"
+                    "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}",
+                    valid_time=selfless.valid_time,
                 )
             )
         )
@@ -47,7 +50,8 @@ class XTDBSession:
         origins = list(
             chain.from_iterable(
                 selfless.client.query(
-                    '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}'
+                    '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}',
+                    valid_time=selfless.valid_time,
                 )
             )
         )
@@ -82,7 +86,7 @@ class XTDBSession:
         ]
 
 
-app = Dash(__name__)
+app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
 
 session = XTDBSession("0")
 base_elements = session.nodes + session.edges
@@ -110,7 +114,7 @@ app.layout = html.Div(
     [
         dcc.Interval(
             id="updater",
-            interval=1913,
+            interval=997,
         ),
         dcc.Location(id="url", refresh=False),
         cyto.Cytoscape(
@@ -146,27 +150,64 @@ app.layout = html.Div(
                 "z-index": 1,
             },
         ),
+        html.Div(
+            [
+                dcc.Input(
+                    id="datetime",
+                    type="text",
+                    placeholder=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    style={
+                        "background": "rgba(255, 255, 255, 0.5)",
+                        "border": "1px solid rgba(0, 0, 0, 0.5)",
+                        "border-radius": "10px",
+                        "padding": "10px",
+                        "width": "130px",
+                        "z-index": "1",
+                    },
+                )
+            ],
+            style={
+                "position": "absolute",
+                "right": "10px",
+                "top": "30px",
+            },
+        ),
     ]
 )
 
 
 @app.callback(
     Output("cytoscape", "elements"),
+    Output("datetime", "placeholder"),
     Input("updater", "n_intervals"),
     Input("url", "search"),
+    Input("datetime", "value"),
 )
-def update_graph(_, search):
+def update_graph(_, search, value):
+    global session
+    session.valid_time = datetime.now()
+    if value:
+        try:
+            new_time = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            new_time = datetime.now()
+        if session.valid_time != new_time:
+            session.valid_time = new_time
+    print(session.valid_time)
     params = urllib.parse.parse_qs(search.lstrip("?"))
     xtdb_node = params.get("node", "0")[0]
     if xtdb_node != session.node:
         session.connect(xtdb_node)
     global base_elements
     new_elements = session.nodes + session.edges
-    if [element for element in new_elements if element not in base_elements]:
+    if not new_elements:
         base_elements = new_elements
-        return new_elements
+        return new_elements, session.valid_time
+    elif [element for element in new_elements if element not in base_elements]:
+        base_elements = new_elements
+        return new_elements, session.valid_time
     else:
-        return no_update
+        return no_update, session.valid_time
 
 
 @app.callback(
