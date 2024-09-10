@@ -1,5 +1,6 @@
 import hashlib
 import json
+import sys
 import urllib.parse
 from datetime import datetime
 from itertools import chain
@@ -12,6 +13,9 @@ from xtdb_client import XTDBClient
 cyto.load_extra_layouts()
 
 
+DEFAULT_XTDB_NODE = "0"
+
+
 def colorize(a: str) -> str:
     seed = "137"
     h = int(hashlib.sha512((seed + a + seed).encode()).hexdigest(), 16)
@@ -19,13 +23,17 @@ def colorize(a: str) -> str:
 
 
 class XTDBSession:
-    def __init__(selfless, xtdb_node: str):
+    def __init__(selfless, xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE):
         selfless.connect(xtdb_node)
         selfless.valid_time: datetime = datetime.now()
 
     def connect(selfless, xtdb_node: str):
         selfless.node: str = xtdb_node
-        selfless.client: XTDBClient = XTDBClient("http://localhost:3000", xtdb_node, 7200)
+        selfless.client: XTDBClient = XTDBClient(
+            "http://localhost:3000",
+            xtdb_node,
+            7200,
+        )
 
     @property
     def nodes(selfless):
@@ -85,12 +93,27 @@ class XTDBSession:
             for source, target, info, kind in connectors
         ]
 
+    @property
+    def elements(selfless):
+        status = selfless.client.status()
+        if "error" in status:
+            return [
+                {
+                    "data": {
+                        "id": "error",
+                        "label": status["error"],
+                        "info": {"error": f"node '{selfless.node}' not found"},
+                    },
+                    "style": {"background-color": colorize("error")},
+                }
+            ]
+        else:
+            return selfless.nodes + selfless.edges
+
 
 app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
-
-session = XTDBSession("0")
-base_elements = session.nodes + session.edges
-
+session = XTDBSession()
+base_elements = session.elements
 
 default_stylesheet = [
     {
@@ -194,11 +217,11 @@ def update_graph(_, search, value):
         if session.valid_time != new_time:
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
-    xtdb_node = params.get("node", "0")[0]
+    xtdb_node = params.get("node", session.node)[0]
     if xtdb_node != session.node:
         session.connect(xtdb_node)
     global base_elements
-    new_elements = session.nodes + session.edges
+    new_elements = session.elements
     if not new_elements:
         base_elements = new_elements
         return new_elements, session.valid_time
