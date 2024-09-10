@@ -23,7 +23,10 @@ def colorize(a: str) -> str:
 
 
 class XTDBSession:
-    def __init__(selfless, xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE):
+    def __init__(
+        selfless,
+        xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE,
+    ):
         selfless.connect(xtdb_node)
         selfless.valid_time: datetime = datetime.now()
 
@@ -34,64 +37,6 @@ class XTDBSession:
             xtdb_node,
             7200,
         )
-
-    @property
-    def nodes(selfless):
-        oois = list(
-            chain.from_iterable(
-                selfless.client.query(
-                    "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}",
-                    valid_time=selfless.valid_time,
-                )
-            )
-        )
-        return [
-            {
-                "data": {"id": ooi["xt/id"], "label": ooi["object_type"], "info": ooi},
-                "style": {"background-color": colorize(ooi["object_type"])},
-            }
-            for ooi in oois
-        ]
-
-    @property
-    def edges(selfless):
-        origins = list(
-            chain.from_iterable(
-                selfless.client.query(
-                    '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}',
-                    valid_time=selfless.valid_time,
-                )
-            )
-        )
-        connectors = list(
-            chain.from_iterable(
-                [
-                    zip(
-                        [origin["source"]] * len(origin["result"]),
-                        origin["result"],
-                        [origin] * len(origin["result"]),
-                        [origin["origin_type"]] * len(origin["result"]),
-                    )
-                    for origin in origins
-                    if len(origin["result"]) > 0
-                ]
-            )
-        )
-        return [
-            {
-                "data": {
-                    "source": source,
-                    "target": target,
-                    "info": info,
-                    "kind": kind,
-                },
-                "style": {
-                    "line-color": colorize(kind),
-                    "target-arrow-color": colorize(kind),
-                },
-            }
-            for source, target, info, kind in connectors
-        ]
 
     @property
     def elements(selfless):
@@ -108,7 +53,85 @@ class XTDBSession:
                 }
             ]
         else:
-            return selfless.nodes + selfless.edges
+            oois = list(
+                chain.from_iterable(
+                    selfless.client.query(
+                        "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}",
+                        valid_time=selfless.valid_time,
+                    )
+                )
+            )
+            origins = list(
+                chain.from_iterable(
+                    selfless.client.query(
+                        '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}',
+                        valid_time=selfless.valid_time,
+                    )
+                )
+            )
+            xtids = list(map(lambda ooi: ooi["xt/id"], oois))
+            connectors = list(
+                chain.from_iterable(
+                    [
+                        zip(
+                            [origin["source"]] * len(origin["result"]),
+                            origin["result"],
+                            [origin] * len(origin["result"]),
+                            [origin["origin_type"]] * len(origin["result"]),
+                        )
+                        for origin in origins
+                        if len(origin["result"]) > 0
+                    ]
+                )
+            )
+            fakes = [
+                {
+                    "data": {
+                        "id": fake,
+                        "label": "Fake",
+                        "info": {"error": "element not present in xtdb", "xt/id": fake},
+                    },
+                    "style": {"background-color": "red"},
+                }
+                for fake in [
+                    connector[0]
+                    for connector in connectors
+                    if connector[0] not in xtids
+                ]
+                + [
+                    connector[1]
+                    for connector in connectors
+                    for connector in connectors
+                    if connector[1] not in xtids
+                ]
+            ]
+            edges = [
+                {
+                    "data": {
+                        "source": source,
+                        "target": target,
+                        "info": info,
+                        "kind": kind,
+                    },
+                    "style": {
+                        "line-color": colorize(kind),
+                        "target-arrow-color": colorize(kind),
+                    },
+                }
+                for source, target, info, kind in connectors
+            ]
+            nodes = [
+                {
+                    "data": {
+                        "id": ooi["xt/id"],
+                        "label": ooi["object_type"],
+                        "info": ooi,
+                    },
+                    "style": {"background-color": colorize(ooi["object_type"])},
+                }
+                for ooi in oois
+            ]
+            return nodes + fakes + edges
 
 
 app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
@@ -166,10 +189,13 @@ app.layout = html.Div(
                 "border": "1px solid rgba(0, 0, 0, 0.5)",
                 "border-radius": "10px",
                 "left": "10px",
+                "max-width": "calc(100vw - 230px)",
+                "overflow-wrap": "break-word",
                 "padding": "10px",
                 "position": "absolute",
                 "top": "10px",
                 "white-space": "pre-wrap",
+                "word-break": "break-all",
                 "z-index": 1,
             },
         ),
@@ -192,7 +218,7 @@ app.layout = html.Div(
             style={
                 "position": "absolute",
                 "right": "10px",
-                "top": "30px",
+                "top": "22px",
             },
         ),
     ]
