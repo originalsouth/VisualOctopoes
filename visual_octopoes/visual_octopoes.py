@@ -40,14 +40,17 @@ class XTDBSession:
 
     @property
     def elements(selfless):
-        status = selfless.client.status()
+        try:
+            status = selfless.client.status()
+        except Exception as e:
+            status = {"error": str(e)}
         if "error" in status:
             return [
                 {
                     "data": {
                         "id": "error",
-                        "label": status["error"],
-                        "info": {"error": f"node '{selfless.node}' not found"},
+                        "label": "Error",
+                        "info": status | {"node": selfless.node, "default_node": DEFAULT_XTDB_NODE},
                     },
                     "style": {"background-color": colorize("error")},
                 }
