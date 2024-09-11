@@ -73,6 +73,11 @@ class XTDBSession:
                 )
             )
             xtids = list(map(lambda ooi: ooi["xt/id"], oois))
+            fake_null = False
+            for origin in origins:
+                if not origin["result"]:
+                    origin["result"].append("fake_null")
+                    fake_null = True
             connectors = list(
                 chain.from_iterable(
                     [
@@ -83,7 +88,6 @@ class XTDBSession:
                             [origin["origin_type"]] * len(origin["result"]),
                         )
                         for origin in origins
-                        if len(origin["result"]) > 0
                     ]
                 )
             )
@@ -92,9 +96,9 @@ class XTDBSession:
                     "data": {
                         "id": fake,
                         "label": "Fake",
-                        "info": {"error": "element not present in xtdb", "xt/id": fake},
+                        "info": {"error": "ooi not present in xtdb but found in origin", "xt/id": fake},
                     },
-                    "style": {"background-color": "red"},
+                    "style": {"background-color": "#FF0000"},
                 }
                 for fake in [
                     connector[0]
@@ -105,9 +109,23 @@ class XTDBSession:
                     connector[1]
                     for connector in connectors
                     for connector in connectors
-                    if connector[1] not in xtids
+                    if connector[1] != "fake_null" and connector[1] not in xtids
                 ]
             ]
+            if fake_null:
+                fakes.append(
+                    {
+                        "data": {
+                            "id": "fake_null",
+                            "label": "Null",
+                            "info": {"error": "the origin pointing to this node has no result"},
+                        },
+                        "style": {"background-color": "#FF0000"},
+                    }
+                )
+            for origin in origins:
+                if "fake_null" in origin["result"]:
+                    origin["result"].remove("fake_null")
             edges = [
                 {
                     "data": {
