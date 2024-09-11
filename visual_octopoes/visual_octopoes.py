@@ -272,7 +272,7 @@ def update_graph(_, search, value):
     if not new_elements:
         base_elements = new_elements
         return new_elements, session.valid_time
-    elif [element for element in new_elements if element not in base_elements]:
+    elif any(element for element in new_elements if element not in base_elements):
         base_elements = new_elements
         return new_elements, session.valid_time
     else:
