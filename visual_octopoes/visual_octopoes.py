@@ -2,7 +2,7 @@ import hashlib
 import json
 import sys
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import chain
 
 import dash_cytoscape as cyto
@@ -28,7 +28,7 @@ class XTDBSession:
         xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE,
     ):
         selfless.connect(xtdb_node)
-        selfless.valid_time: datetime = datetime.now()
+        selfless.valid_time: datetime = datetime.now(timezone.utc)
 
     def connect(selfless, xtdb_node: str):
         selfless.node: str = xtdb_node
@@ -225,7 +225,7 @@ app.layout = html.Div(
                 dcc.Input(
                     id="datetime",
                     type="text",
-                    placeholder=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    placeholder=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
                     style={
                         "background": "rgba(255, 255, 255, 0.5)",
                         "border": "1px solid rgba(0, 0, 0, 0.5)",
@@ -255,12 +255,12 @@ app.layout = html.Div(
 )
 def update_graph(_, search, value):
     global session
-    session.valid_time = datetime.now()
+    session.valid_time = datetime.now(timezone.utc)
     if value:
         try:
             new_time = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
         except ValueError:
-            new_time = datetime.now()
+            new_time = datetime.now(timezone.utc)
         if session.valid_time != new_time:
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
