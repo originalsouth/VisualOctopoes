@@ -210,8 +210,10 @@ app.layout = html.Div(
                 "border": "1px solid rgba(0, 0, 0, 0.5)",
                 "border-radius": "10px",
                 "left": "10px",
+                "max-height": "90vh",
                 "max-width": "calc(100vw - 230px)",
                 "overflow-wrap": "break-word",
+                "overflow-y": "auto",
                 "padding": "10px",
                 "position": "absolute",
                 "top": "10px",
@@ -279,19 +281,33 @@ def update_graph(_, search, value):
         return no_update, session.valid_time
 
 
+REGISTER = "Press a node or edge for content info"
+
+
 @app.callback(
     Output("info", "children"),
     Input("cytoscape", "selectedNodeData"),
     Input("cytoscape", "selectedEdgeData"),
 )
 def display_info(node_info, edge_info):
+    global REGISTER
+    global session
+    retval = "Press a node or edge for content info"
+
     if node_info:
-        return json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
+        retval = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
+        if retval == REGISTER:
+            data = session.client.history(node_info[0]["id"], True, True)
+            retval = json.dumps(data, sort_keys=True, indent=2)
 
     if edge_info:
-        return json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
+        retval = json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
+        if retval == REGISTER:
+            data = session.client.history(edge_info[0]["info"]["xt/id"], True, True)
+            retval = json.dumps(data, sort_keys=True, indent=2)
 
-    return "Press a node or edge for content info"
+    REGISTER = retval
+    return retval
 
 
 if __name__ == "__main__":
