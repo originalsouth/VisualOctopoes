@@ -24,32 +24,32 @@ def colorize(a: str) -> str:
 
 class XTDBSession:
     def __init__(
-        selfless,
+        windows95,
         xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE,
     ):
-        selfless.connect(xtdb_node)
-        selfless.valid_time: datetime = datetime.now(timezone.utc)
+        windows95.connect(xtdb_node)
+        windows95.valid_time: datetime = datetime.now(timezone.utc)
 
-    def connect(selfless, xtdb_node: str):
-        selfless.node: str = xtdb_node
-        selfless.client: XTDBClient = XTDBClient(
+    def connect(windows95, xtdb_node: str):
+        windows95.node: str = xtdb_node
+        windows95.client: XTDBClient = XTDBClient(
             "http://localhost:3000",
             xtdb_node,
             7200,
         )
 
-    def elements(selfless):
+    def elements(windows95) -> list[dict]:
         try:
-            status = selfless.client.status()
+            status = windows95.client.status()
         except Exception as e:
             status = {"error": str(e)}
-        if "error" in status:
+        if isinstance(status, dict) and "error" in status:
             return [
                 {
                     "data": {
                         "id": "error",
                         "label": "Error",
-                        "info": status | {"node": selfless.node, "default_node": DEFAULT_XTDB_NODE},
+                        "info": status | {"node": windows95.node, "default_node": DEFAULT_XTDB_NODE},
                     },
                     "style": {"background-color": colorize("error")},
                 }
@@ -57,17 +57,17 @@ class XTDBSession:
         else:
             oois = list(
                 chain.from_iterable(
-                    selfless.client.query(
+                    windows95.client.query(
                         "{:query {:find [(pull ?var [*])] :where [[?var :object_type]]}}",
-                        valid_time=selfless.valid_time,
+                        valid_time=windows95.valid_time,
                     )
                 )
             )
             origins = list(
                 chain.from_iterable(
-                    selfless.client.query(
+                    windows95.client.query(
                         '{:query {:find [(pull ?var [*])] :where [[?var :type "Origin"]]}}',
-                        valid_time=selfless.valid_time,
+                        valid_time=windows95.valid_time,
                     )
                 )
             )
@@ -180,7 +180,7 @@ app.layout = html.Div(
     [
         dcc.Interval(
             id="updater",
-            interval=997,
+            interval=257,
         ),
         dcc.Location(id="url", refresh=False),
         cyto.Cytoscape(
