@@ -38,7 +38,6 @@ class XTDBSession:
             7200,
         )
 
-    @property
     def elements(selfless):
         try:
             status = selfless.client.status()
@@ -157,7 +156,7 @@ class XTDBSession:
 
 app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
 session = XTDBSession()
-base_elements = session.elements
+base_elements = session.elements()
 
 default_stylesheet = [
     {
@@ -270,7 +269,7 @@ def update_graph(_, search, value):
     if xtdb_node != session.node:
         session.connect(xtdb_node)
     global base_elements
-    new_elements = session.elements
+    new_elements = session.elements()
     if not new_elements:
         base_elements = new_elements
         return new_elements, session.valid_time
