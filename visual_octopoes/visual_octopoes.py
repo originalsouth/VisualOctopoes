@@ -4,6 +4,7 @@ import sys
 import urllib.parse
 from datetime import datetime, timezone
 from itertools import chain
+from copy import deepcopy
 
 import dash_cytoscape as cyto
 from dash import Dash, dcc, html, no_update
@@ -30,7 +31,10 @@ class XTDBSession:
         windows95.connect(xtdb_node)
         windows95.valid_time: datetime = datetime.now(timezone.utc)
 
-    def connect(windows95, xtdb_node: str):
+    def connect(
+        windows95,
+        xtdb_node: str,
+    ) -> None:
         windows95.node: str = xtdb_node
         windows95.client: XTDBClient = XTDBClient(
             "http://localhost:3000",
@@ -38,7 +42,11 @@ class XTDBSession:
             7200,
         )
 
-    def elements(windows95) -> list[dict]:
+    def elements(
+        windows95,
+        add_fakes: bool = True,
+        add_fake_null: bool = True,
+    ) -> list[dict]:
         try:
             status = windows95.client.status()
         except Exception as e:
@@ -49,7 +57,8 @@ class XTDBSession:
                     "data": {
                         "id": "error",
                         "label": "Error",
-                        "info": status | {"node": windows95.node, "default_node": DEFAULT_XTDB_NODE},
+                        "info": status
+                        | {"node": windows95.node, "default_node": DEFAULT_XTDB_NODE},
                     },
                     "style": {"background-color": colorize("error")},
                 }
@@ -74,7 +83,7 @@ class XTDBSession:
             xtids = list(map(lambda ooi: ooi["xt/id"], oois))
             fake_null = False
             for origin in origins:
-                if not origin["result"]:
+                if not origin["result"] and add_fake_null:
                     origin["result"].append("fake_null")
                     fake_null = True
             connectors = list(
@@ -92,10 +101,14 @@ class XTDBSession:
             )
             fakes = [
                 {
+                    "uid": fake,
                     "data": {
                         "id": fake,
                         "label": "Fake",
-                        "info": {"error": "ooi not present in xtdb but found in origin", "xt/id": fake},
+                        "info": {
+                            "error": "ooi not present in xtdb but found in origin",
+                            "xt/id": fake,
+                        },
                     },
                     "style": {"background-color": "#FF0000"},
                 }
@@ -110,14 +123,17 @@ class XTDBSession:
                     for connector in connectors
                     if connector[1] != "fake_null" and connector[1] not in xtids
                 ]
-            ]
+            ] if add_fakes else []
             if fake_null:
                 fakes.append(
                     {
+                        "uid": "0",
                         "data": {
                             "id": "fake_null",
                             "label": "Null",
-                            "info": {"error": "the origin pointing to this node has no result"},
+                            "info": {
+                                "error": "the origin pointing to this node has no result"
+                            },
                         },
                         "style": {"background-color": "#FF0000"},
                     }
@@ -127,6 +143,7 @@ class XTDBSession:
                     origin["result"].remove("fake_null")
             edges = [
                 {
+                    "uid": source+"|"+target,
                     "data": {
                         "source": source,
                         "target": target,
@@ -142,6 +159,7 @@ class XTDBSession:
             ]
             nodes = [
                 {
+                    "uid": ooi["xt/id"],
                     "data": {
                         "id": ooi["xt/id"],
                         "label": ooi["object_type"],
@@ -156,7 +174,16 @@ class XTDBSession:
 
 app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
 session = XTDBSession()
-base_elements = session.elements()
+base_elements = [
+    {
+        "data": {
+            "id": "initializing",
+            "label": "Initializing...",
+            "info": {"current_node": session.node, "default_node": DEFAULT_XTDB_NODE},
+        },
+        "style": {"background-color": colorize("error")},
+    }
+]
 
 default_stylesheet = [
     {
@@ -226,7 +253,9 @@ app.layout = html.Div(
                 dcc.Input(
                     id="datetime",
                     type="text",
-                    placeholder=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+                    placeholder=datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%S"
+                    ),
                     style={
                         "background": "rgba(255, 255, 255, 0.5)",
                         "border": "1px solid rgba(0, 0, 0, 0.5)",
@@ -247,14 +276,40 @@ app.layout = html.Div(
 )
 
 
+def deep_merge_dict(dict1, dict2):
+    for key, value in dict2.items():
+        if key in dict1 and isinstance(dict1[key], dict) and isinstance(value, dict):
+            dict1[key] = deep_merge_dict(dict1[key], value)
+        else:
+            dict1[key] = value
+    return dict1
+
+
+def deep_merge_lists(list1, list2, uid_key="uid"):
+    retval = {}
+    for item in list1:
+        uid = item.get(uid_key)
+        if uid is not None:
+            retval[uid] = item
+    for item in list2:
+        uid = item.get(uid_key)
+        if uid is not None:
+            if uid in retval:
+                retval[uid] = deep_merge_dict(retval[uid], item)
+            else:
+                retval[uid] = item
+    return list(retval.values())
+
+
 @app.callback(
     Output("cytoscape", "elements"),
     Output("datetime", "placeholder"),
     Input("updater", "n_intervals"),
     Input("url", "search"),
     Input("datetime", "value"),
+    Input("cytoscape", "elements"),
 )
-def update_graph(_, search, value):
+def update_graph(_, search, value, current_elements):
     global session
     session.valid_time = datetime.now(timezone.utc)
     if value:
@@ -266,18 +321,19 @@ def update_graph(_, search, value):
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
     xtdb_node = params.get("node", session.node)[0]
-    if xtdb_node != session.node:
+    add_fakes = False if params.get("nofakes", "0")[0] == "1" else True
+    add_fake_null = False if params.get("nonull", "0")[0] == "1" else True
+    if session.node != xtdb_node:
         session.connect(xtdb_node)
+    new_elements = session.elements(add_fakes, add_fake_null)
     global base_elements
-    new_elements = session.elements()
-    if not new_elements:
-        base_elements = new_elements
-        return new_elements, session.valid_time
-    elif any(element for element in new_elements if element not in base_elements):
-        base_elements = new_elements
-        return new_elements, session.valid_time
+    base_hash = hashlib.sha512(json.dumps(base_elements, sort_keys=True).encode()).hexdigest()
+    new_hash = hashlib.sha512(json.dumps(new_elements, sort_keys=True).encode()).hexdigest()
+    if base_hash == new_hash:
+        return current_elements, session.valid_time
     else:
-        return no_update, session.valid_time
+        base_elements = new_elements
+        return deep_merge_lists(current_elements, new_elements, "uid"), session.valid_time
 
 
 REGISTER = "Press a node or edge for content info"
