@@ -83,6 +83,14 @@ class XTDBSession:
                     )
                 )
             )
+            scan_profiles = list(
+                chain.from_iterable(
+                    windows95.client.query(
+                        '{:query {:find [(pull ?var [*])] :where [[?var :type "ScanProfile"]]}}',
+                        valid_time=windows95.valid_time,
+                    )
+                )
+            )
             xtids = list(map(lambda ooi: ooi["xt/id"], oois))
             fake_null = False
             for origin in origins:
@@ -102,6 +110,12 @@ class XTDBSession:
                     ]
                 )
             )
+            profiles = {sp["reference"]: sp for sp in scan_profiles}
+            profile_borders = {
+                "declared": "solid",
+                "inherited": "dashed",
+                "empty": "none",
+            }
             fakes = (
                 [
                     {
@@ -169,7 +183,22 @@ class XTDBSession:
                         "label": ooi["object_type"],
                         "info": ooi,
                     },
-                    "style": {"background-color": colorize(ooi["object_type"])},
+                    "style": {
+                        "background-color": colorize(ooi["object_type"]),
+                        "border-width": (
+                            f"{2 * int(profiles[ooi["xt/id"]]["level"])}px"
+                            if ooi["xt/id"] in profiles
+                            else "8px"
+                        ),
+                        "border-color": "black" if ooi["xt/id"] in profiles else "red",
+                        "border-style": (
+                            profile_borders[profiles[ooi["xt/id"]]["scan_profile_type"]]
+                            if ooi["xt/id"] in profiles
+                            and profiles[ooi["xt/id"]]["scan_profile_type"]
+                            in profile_borders
+                            else "double"
+                        ),
+                    },
                 }
                 for ooi in oois
             ]
@@ -324,9 +353,7 @@ def update_graph(_, search, value, current_elements):
         )
         for element in new_elements
     ]
-    if set(
-        element["data"]["info"]["xt/id"] for element in current_elements
-    ) != set(
+    if set(element["data"]["info"]["xt/id"] for element in current_elements) != set(
         element["data"]["info"]["xt/id"] for element in update_elements
     ):
         return update_elements, session.valid_time
