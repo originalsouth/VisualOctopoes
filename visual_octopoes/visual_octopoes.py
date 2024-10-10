@@ -4,10 +4,9 @@ import sys
 import urllib.parse
 from datetime import datetime, timezone
 from itertools import chain
-from copy import deepcopy
 
 import dash_cytoscape as cyto
-from dash import Dash, dcc, html, no_update
+from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from xtdb_client import XTDBClient
 
@@ -58,7 +57,11 @@ class XTDBSession:
                         "id": "error",
                         "label": "Error",
                         "info": status
-                        | {"node": windows95.node, "default_node": DEFAULT_XTDB_NODE},
+                        | {
+                            "node": windows95.node,
+                            "default_node": DEFAULT_XTDB_NODE,
+                            "xt/id": "error",
+                        },
                     },
                     "style": {"background-color": colorize("error")},
                 }
@@ -99,40 +102,44 @@ class XTDBSession:
                     ]
                 )
             )
-            fakes = [
-                {
-                    "uid": fake,
-                    "data": {
-                        "id": fake,
-                        "label": "Fake",
-                        "info": {
-                            "error": "ooi not present in xtdb but found in origin",
-                            "xt/id": fake,
+            fakes = (
+                [
+                    {
+                        "data": {
+                            "id": fake,
+                            "uid": fake,
+                            "label": "Fake",
+                            "info": {
+                                "error": "ooi not present in xtdb but found in origin",
+                                "xt/id": fake,
+                            },
                         },
-                    },
-                    "style": {"background-color": "#FF0000"},
-                }
-                for fake in [
-                    connector[0]
-                    for connector in connectors
-                    if connector[0] not in xtids
+                        "style": {"background-color": "#FF0000"},
+                    }
+                    for fake in [
+                        connector[0]
+                        for connector in connectors
+                        if connector[0] not in xtids
+                    ]
+                    + [
+                        connector[1]
+                        for connector in connectors
+                        for connector in connectors
+                        if connector[1] != "fake_null" and connector[1] not in xtids
+                    ]
                 ]
-                + [
-                    connector[1]
-                    for connector in connectors
-                    for connector in connectors
-                    if connector[1] != "fake_null" and connector[1] not in xtids
-                ]
-            ] if add_fakes else []
+                if add_fakes
+                else []
+            )
             if fake_null:
                 fakes.append(
                     {
-                        "uid": "0",
                         "data": {
                             "id": "fake_null",
                             "label": "Null",
                             "info": {
-                                "error": "the origin pointing to this node has no result"
+                                "error": "the origin pointing to this node has no result",
+                                "xt/id": "fake_null",
                             },
                         },
                         "style": {"background-color": "#FF0000"},
@@ -143,7 +150,6 @@ class XTDBSession:
                     origin["result"].remove("fake_null")
             edges = [
                 {
-                    "uid": source+"|"+target,
                     "data": {
                         "source": source,
                         "target": target,
@@ -159,7 +165,6 @@ class XTDBSession:
             ]
             nodes = [
                 {
-                    "uid": ooi["xt/id"],
                     "data": {
                         "id": ooi["xt/id"],
                         "label": ooi["object_type"],
@@ -177,9 +182,14 @@ session = XTDBSession()
 base_elements = [
     {
         "data": {
-            "id": "initializing",
+            "id": "init",
+            "uid": "init",
             "label": "Initializing...",
-            "info": {"current_node": session.node, "default_node": DEFAULT_XTDB_NODE},
+            "info": {
+                "current_node": session.node,
+                "default_node": DEFAULT_XTDB_NODE,
+                "xt/id": "init",
+            },
         },
         "style": {"background-color": colorize("error")},
     }
@@ -326,14 +336,29 @@ def update_graph(_, search, value, current_elements):
     if session.node != xtdb_node:
         session.connect(xtdb_node)
     new_elements = session.elements(add_fakes, add_fake_null)
-    global base_elements
-    base_hash = hashlib.sha512(json.dumps(base_elements, sort_keys=True).encode()).hexdigest()
-    new_hash = hashlib.sha512(json.dumps(new_elements, sort_keys=True).encode()).hexdigest()
-    if base_hash == new_hash:
-        return current_elements, session.valid_time
+    curdict = {
+        element["data"]["info"]["xt/id"]: element for element in current_elements
+    }
+    update_elements = [
+        (
+            {
+                **element,
+                "position": curdict[element["data"]["info"]["xt/id"]]["position"],
+            }
+            if element["data"]["info"]["xt/id"] in curdict
+            and "position" in curdict[element["data"]["info"]["xt/id"]]
+            else element
+        )
+        for element in new_elements
+    ]
+    if set(
+        element["data"]["info"]["xt/id"] for element in current_elements
+    ) != set(
+        element["data"]["info"]["xt/id"] for element in update_elements
+    ):
+        return update_elements, session.valid_time
     else:
-        base_elements = new_elements
-        return deep_merge_lists(current_elements, new_elements, "uid"), session.valid_time
+        return current_elements, session.valid_time
 
 
 REGISTER = "Press a node or edge for content info"
