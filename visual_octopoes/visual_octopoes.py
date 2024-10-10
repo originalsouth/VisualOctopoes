@@ -127,7 +127,7 @@ class XTDBSession:
                                 "xt/id": fake,
                             },
                         },
-                        "style": {"background-color": "#FF0000"},
+                        "style": {"background-color": "red"},
                     }
                     for fake in [
                         connector[0]
@@ -155,7 +155,7 @@ class XTDBSession:
                                 "xt/id": "fake_null",
                             },
                         },
-                        "style": {"background-color": "#FF0000"},
+                        "style": {"background-color": "red"},
                     }
                 )
             for origin in origins:
@@ -188,7 +188,7 @@ class XTDBSession:
                         "border-width": (
                             f"{2 * int(profiles[ooi["xt/id"]]["level"])}px"
                             if ooi["xt/id"] in profiles
-                            else "8px"
+                            else "10px"
                         ),
                         "border-color": "black" if ooi["xt/id"] in profiles else "red",
                         "border-style": (
