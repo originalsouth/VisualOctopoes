@@ -107,7 +107,6 @@ class XTDBSession:
                     {
                         "data": {
                             "id": fake,
-                            "uid": fake,
                             "label": "Fake",
                             "info": {
                                 "error": "ooi not present in xtdb but found in origin",
@@ -183,7 +182,6 @@ base_elements = [
     {
         "data": {
             "id": "init",
-            "uid": "init",
             "label": "Initializing...",
             "info": {
                 "current_node": session.node,
@@ -284,31 +282,6 @@ app.layout = html.Div(
         ),
     ]
 )
-
-
-def deep_merge_dict(dict1, dict2):
-    for key, value in dict2.items():
-        if key in dict1 and isinstance(dict1[key], dict) and isinstance(value, dict):
-            dict1[key] = deep_merge_dict(dict1[key], value)
-        else:
-            dict1[key] = value
-    return dict1
-
-
-def deep_merge_lists(list1, list2, uid_key="uid"):
-    retval = {}
-    for item in list1:
-        uid = item.get(uid_key)
-        if uid is not None:
-            retval[uid] = item
-    for item in list2:
-        uid = item.get(uid_key)
-        if uid is not None:
-            if uid in retval:
-                retval[uid] = deep_merge_dict(retval[uid], item)
-            else:
-                retval[uid] = item
-    return list(retval.values())
 
 
 @app.callback(
