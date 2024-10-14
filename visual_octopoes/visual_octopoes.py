@@ -296,14 +296,14 @@ app.layout = html.Div(
                 "background": "rgba(255, 255, 255, 0.5)",
                 "border": "1px solid rgba(0, 0, 0, 0.5)",
                 "border-radius": "10px",
-                "left": "10px",
+                "right": "10px",
                 "max-height": "90vh",
                 "max-width": "calc(100vw - 230px)",
                 "overflow-wrap": "break-word",
                 "overflow-y": "auto",
                 "padding": "10px",
                 "position": "absolute",
-                "bottom": "10px",
+                "top": "10px",
                 "white-space": "pre-wrap",
                 "word-break": "break-all",
                 "z-index": 1,
@@ -329,8 +329,8 @@ app.layout = html.Div(
             ],
             style={
                 "position": "absolute",
-                "right": "10px",
-                "top": "22px",
+                "left": "10px",
+                "bottom": "22px",
             },
         ),
     ]
@@ -410,13 +410,15 @@ def display_info(node_info, edge_info, profile_style):
     retval3 = {**profile_style, "display": "none"}
 
     if node_info:
-        retval1 = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
-        retval2 = json.dumps(node_info[0]["profile"], sort_keys=True, indent=2)
         if "display" in retval3:
             retval3.pop("display")
+        retval1 = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
+        retval2 = json.dumps(node_info[0]["profile"], sort_keys=True, indent=2)
         if retval1 == REGISTER:
             data = session.client.history(node_info[0]["id"], True, True)
             retval1 = json.dumps(data, sort_keys=True, indent=2)
+            profile = session.client.history(node_info[0]["profile"]["xt/id"], True, True)
+            retval2 = json.dumps(profile, sort_keys=True, indent=2)
 
     if edge_info:
         retval1 = json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
