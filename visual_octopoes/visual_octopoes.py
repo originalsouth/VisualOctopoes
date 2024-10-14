@@ -2,6 +2,7 @@ import hashlib
 import json
 import sys
 import urllib.parse
+from copy import deepcopy
 from datetime import datetime, timezone
 from itertools import chain
 
@@ -182,6 +183,9 @@ class XTDBSession:
                         "id": ooi["xt/id"],
                         "label": ooi["object_type"],
                         "info": ooi,
+                        "profile": (
+                            profiles[ooi["xt/id"]] if ooi["xt/id"] in profiles else None
+                        ),
                     },
                     "style": {
                         "background-color": colorize(ooi["object_type"]),
@@ -273,13 +277,33 @@ app.layout = html.Div(
                 "border": "1px solid rgba(0, 0, 0, 0.5)",
                 "border-radius": "10px",
                 "left": "10px",
-                "max-height": "90vh",
+                "max-height": "80vh",
                 "max-width": "calc(100vw - 230px)",
                 "overflow-wrap": "break-word",
                 "overflow-y": "auto",
                 "padding": "10px",
                 "position": "absolute",
                 "top": "10px",
+                "white-space": "pre-wrap",
+                "word-break": "break-all",
+                "z-index": 1,
+            },
+        ),
+        html.Pre(
+            id="profile",
+            contentEditable="true",
+            style={
+                "background": "rgba(255, 255, 255, 0.5)",
+                "border": "1px solid rgba(0, 0, 0, 0.5)",
+                "border-radius": "10px",
+                "left": "10px",
+                "max-height": "90vh",
+                "max-width": "calc(100vw - 230px)",
+                "overflow-wrap": "break-word",
+                "overflow-y": "auto",
+                "padding": "10px",
+                "position": "absolute",
+                "bottom": "10px",
                 "white-space": "pre-wrap",
                 "word-break": "break-all",
                 "z-index": 1,
@@ -313,6 +337,9 @@ app.layout = html.Div(
 )
 
 
+ELEMENT_CACHE = []
+
+
 @app.callback(
     Output("cytoscape", "elements"),
     Output("datetime", "placeholder"),
@@ -341,21 +368,24 @@ def update_graph(_, search, value, current_elements):
     curdict = {
         element["data"]["info"]["xt/id"]: element for element in current_elements
     }
-    update_elements = [
-        (
-            {
-                **element,
-                "position": curdict[element["data"]["info"]["xt/id"]]["position"],
-            }
-            if element["data"]["info"]["xt/id"] in curdict
-            and "position" in curdict[element["data"]["info"]["xt/id"]]
-            else element
-        )
-        for element in new_elements
-    ]
-    if set(element["data"]["info"]["xt/id"] for element in current_elements) != set(
-        element["data"]["info"]["xt/id"] for element in update_elements
-    ):
+    update_elements = sorted(
+        [
+            (
+                {
+                    **element,
+                    "position": curdict[element["data"]["info"]["xt/id"]]["position"],
+                }
+                if element["data"]["info"]["xt/id"] in curdict
+                and "position" in curdict[element["data"]["info"]["xt/id"]]
+                else element
+            )
+            for element in new_elements
+        ],
+        key=lambda element: element["data"]["info"]["xt/id"],
+    )
+    global ELEMENT_CACHE
+    if update_elements != ELEMENT_CACHE:
+        ELEMENT_CACHE = deepcopy(update_elements)
         return update_elements, session.valid_time
     else:
         return current_elements, session.valid_time
@@ -366,28 +396,36 @@ REGISTER = "Press a node or edge for content info"
 
 @app.callback(
     Output("info", "children"),
+    Output("profile", "children"),
+    Output("profile", "style"),
     Input("cytoscape", "selectedNodeData"),
     Input("cytoscape", "selectedEdgeData"),
+    Input("profile", "style"),
 )
-def display_info(node_info, edge_info):
+def display_info(node_info, edge_info, profile_style):
     global REGISTER
     global session
-    retval = "Press a node or edge for content info"
+    retval1 = "Press a node or edge for content info"
+    retval2 = None
+    retval3 = {**profile_style, "display": "none"}
 
     if node_info:
-        retval = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
-        if retval == REGISTER:
+        retval1 = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
+        retval2 = json.dumps(node_info[0]["profile"], sort_keys=True, indent=2)
+        if "display" in retval3:
+            retval3.pop("display")
+        if retval1 == REGISTER:
             data = session.client.history(node_info[0]["id"], True, True)
-            retval = json.dumps(data, sort_keys=True, indent=2)
+            retval1 = json.dumps(data, sort_keys=True, indent=2)
 
     if edge_info:
-        retval = json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
-        if retval == REGISTER:
+        retval1 = json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
+        if retval1 == REGISTER:
             data = session.client.history(edge_info[0]["info"]["xt/id"], True, True)
-            retval = json.dumps(data, sort_keys=True, indent=2)
+            retval1 = json.dumps(data, sort_keys=True, indent=2)
 
-    REGISTER = retval
-    return retval
+    REGISTER = retval1
+    return retval1, retval2, retval3
 
 
 if __name__ == "__main__":
