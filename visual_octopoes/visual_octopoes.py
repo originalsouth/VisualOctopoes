@@ -63,6 +63,7 @@ class XTDBSession:
                             "default_node": DEFAULT_XTDB_NODE,
                             "xt/id": "error",
                         },
+                        "profile": "undifined",
                     },
                     "style": {"background-color": colorize("error")},
                 }
@@ -127,6 +128,7 @@ class XTDBSession:
                                 "error": "ooi not present in xtdb but found in origin",
                                 "xt/id": fake,
                             },
+                            "profile": "undefined",
                         },
                         "style": {"background-color": "red"},
                     }
@@ -155,6 +157,7 @@ class XTDBSession:
                                 "error": "the origin pointing to this node has no result",
                                 "xt/id": "fake_null",
                             },
+                            "profile": "undefined",
                         },
                         "style": {"background-color": "red"},
                     }
@@ -221,6 +224,7 @@ base_elements = [
                 "default_node": DEFAULT_XTDB_NODE,
                 "xt/id": "init",
             },
+            "profile": "undefined",
         },
         "style": {"background-color": colorize("error")},
     }
@@ -278,7 +282,7 @@ app.layout = html.Div(
                 "border-radius": "10px",
                 "left": "10px",
                 "max-height": "80vh",
-                "max-width": "calc(100vw - 230px)",
+                "max-width": "70vw",
                 "overflow-wrap": "break-word",
                 "overflow-y": "auto",
                 "padding": "10px",
@@ -298,7 +302,7 @@ app.layout = html.Div(
                 "border-radius": "10px",
                 "right": "10px",
                 "max-height": "90vh",
-                "max-width": "calc(100vw - 230px)",
+                "max-width": "20vw",
                 "overflow-wrap": "break-word",
                 "overflow-y": "auto",
                 "padding": "10px",
@@ -329,8 +333,8 @@ app.layout = html.Div(
             ],
             style={
                 "position": "absolute",
-                "left": "10px",
-                "bottom": "22px",
+                "right": "10px",
+                "top": "22px",
             },
         ),
     ]
