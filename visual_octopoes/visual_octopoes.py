@@ -421,7 +421,9 @@ def display_info(node_info, edge_info, profile_style):
         if retval1 == REGISTER:
             data = session.client.history(node_info[0]["id"], True, True)
             retval1 = json.dumps(data, sort_keys=True, indent=2)
-            profile = session.client.history(node_info[0]["profile"]["xt/id"], True, True)
+            profile = session.client.history(
+                node_info[0]["profile"]["xt/id"], True, True
+            )
             retval2 = json.dumps(profile, sort_keys=True, indent=2)
 
     if edge_info:
