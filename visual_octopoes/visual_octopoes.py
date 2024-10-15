@@ -388,7 +388,9 @@ def update_graph(_, search, value, current_elements):
         key=lambda element: element["data"]["info"]["xt/id"],
     )
     global ELEMENT_CACHE
-    if update_elements != ELEMENT_CACHE:
+    if len(current_elements) <= 1:
+        return update_elements, session.valid_time
+    elif update_elements != ELEMENT_CACHE:
         ELEMENT_CACHE = deepcopy(update_elements)
         return update_elements, session.valid_time
     else:
