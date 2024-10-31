@@ -87,6 +87,14 @@ class XTDBSession:
                     )
                 )
             )
+            origin_parameters = list(
+                chain.from_iterable(
+                    windows95.client.query(
+                        '{:query {:find [(pull ?var [*])] :where [[?var :type "OriginParameter"]]}}',
+                        valid_time=windows95.valid_time,
+                    )
+                )
+            )
             scan_profiles = list(
                 chain.from_iterable(
                     windows95.client.query(
@@ -109,11 +117,13 @@ class XTDBSession:
                             origin["result"],
                             [origin] * len(origin["result"]),
                             [origin["origin_type"]] * len(origin["result"]),
+                            [origin["xt/id"]] * len(origin["result"]),
                         )
                         for origin in origins
                     ]
                 )
             )
+            parameters = {op["origin_id"]: op for op in origin_parameters}
             profiles = {sp["reference"]: sp for sp in scan_profiles}
             profile_borders = {
                 "declared": "solid",
@@ -174,13 +184,14 @@ class XTDBSession:
                         "target": target,
                         "info": info,
                         "kind": kind,
+                        "parameter": parameters[id] if id in parameters else None
                     },
                     "style": {
                         "line-color": colorize(kind),
                         "target-arrow-color": colorize(kind),
                     },
                 }
-                for source, target, info, kind in connectors
+                for source, target, info, kind, id in connectors
             ]
             nodes = [
                 {
@@ -421,20 +432,29 @@ def display_info(node_info, edge_info, profile_style):
         if "display" in retval3:
             retval3.pop("display")
         retval1 = json.dumps(node_info[0]["info"], sort_keys=True, indent=2)
-        retval2 = json.dumps(node_info[0]["profile"], sort_keys=True, indent=2)
+        retval2 = "\n" + json.dumps(node_info[0]["profile"], sort_keys=True, indent=2)
         if retval1 == REGISTER:
             data = session.client.history(node_info[0]["id"], True, True)
             retval1 = json.dumps(data, sort_keys=True, indent=2)
             profile = session.client.history(
                 node_info[0]["profile"]["xt/id"], True, True
             )
-            retval2 = json.dumps(profile, sort_keys=True, indent=2)
+            retval2 = "\n" + json.dumps(profile, sort_keys=True, indent=2)
 
     if edge_info:
         retval1 = json.dumps(edge_info[0]["info"], sort_keys=True, indent=2)
+        if edge_info[0]["parameter"]:
+            if "display" in retval3:
+                retval3.pop("display")
+            retval2 = "\n" + json.dumps(edge_info[0]["parameter"], sort_keys=True, indent=2)
         if retval1 == REGISTER:
             data = session.client.history(edge_info[0]["info"]["xt/id"], True, True)
             retval1 = json.dumps(data, sort_keys=True, indent=2)
+            if edge_info[0]["parameter"]:
+                if "display" in retval3:
+                    retval3.pop("display")
+                data = session.client.history(edge_info[0]["parameter"]["xt/id"], True, True)
+                retval2 = "\n" + json.dumps(data, sort_keys=True, indent=2)
 
     REGISTER = retval1
     return retval1, retval2, retval3
