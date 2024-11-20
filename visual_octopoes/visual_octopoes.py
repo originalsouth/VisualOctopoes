@@ -46,8 +46,10 @@ class XTDBSession:
 
     def elements(
         windows95,
+        add_origins: bool = True,
         add_fakes: bool = True,
         add_fake_null: bool = True,
+        add_refs: bool = True,
     ) -> list[dict]:
         try:
             status = windows95.client.status()
@@ -103,7 +105,7 @@ class XTDBSession:
                     )
                 )
             )
-            xtids = list(map(lambda ooi: ooi["xt/id"], oois))
+            xtids = set(map(lambda ooi: ooi["xt/id"], oois))
             fake_null = False
             for origin in origins:
                 if not origin["result"] and add_fake_null:
@@ -123,6 +125,33 @@ class XTDBSession:
                     ]
                 )
             )
+            if add_refs:
+                reffields = {
+                    ooi["xt/id"]: (
+                        ooi,
+                        {
+                            key: ooi[key]
+                            for key in set(ooi.keys()) - {"xt/id"}
+                            if ooi[key] in xtids and ooi[key] != ooi["xt/id"]
+                        },
+                    )
+                    for ooi in oois
+                }
+                references = list(
+                    chain.from_iterable(
+                        [
+                            zip(
+                                [xtid] * len(refs),
+                                refs.values(),
+                                [ooi] * len(refs),
+                            )
+                            for xtid, (ooi, refs) in reffields.items()
+                            if refs
+                        ]
+                    )
+                )
+            else:
+                references = []
             parameters = {op["origin_id"]: op for op in origin_parameters}
             profiles = {sp["reference"]: sp for sp in scan_profiles}
             profile_borders = {
@@ -159,7 +188,7 @@ class XTDBSession:
                 if add_fakes
                 else []
             )
-            if fake_null:
+            if fake_null and add_origins:
                 fakes.append(
                     {
                         "data": {
@@ -177,21 +206,42 @@ class XTDBSession:
             for origin in origins:
                 if "fake_null" in origin["result"]:
                     origin["result"].remove("fake_null")
-            edges = [
+            edges = (
+                [
+                    {
+                        "data": {
+                            "source": source,
+                            "target": target,
+                            "info": info,
+                            "kind": kind,
+                            "parameter": parameters[id] if id in parameters else None,
+                        },
+                        "style": {
+                            "line-color": colorize(kind),
+                            "target-arrow-color": colorize(kind),
+                        },
+                    }
+                    for source, target, info, kind, id in connectors
+                ]
+                if add_origins
+                else []
+            )
+            dashes = [
                 {
                     "data": {
-                        "source": source,
+                        "source": input,
                         "target": target,
                         "info": info,
-                        "kind": kind,
-                        "parameter": parameters[id] if id in parameters else None
+                        "kind": "reference",
+                        "parameter": None,
                     },
                     "style": {
-                        "line-color": colorize(kind),
-                        "target-arrow-color": colorize(kind),
+                        "line-color": "gray",
+                        "line-style": "dashed",
+                        "target-arrow-color": "gray",
                     },
                 }
-                for source, target, info, kind, id in connectors
+                for input, target, info in references
             ]
             nodes = [
                 {
@@ -222,7 +272,7 @@ class XTDBSession:
                 }
                 for ooi in oois
             ]
-            return nodes + fakes + edges
+            return nodes + fakes + edges + dashes
 
 
 app = Dash(__name__, title="VisualOctopoesStudio", update_title=None)
@@ -377,11 +427,13 @@ def update_graph(_, search, value, current_elements):
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
     xtdb_node = params.get("node", session.node)[0]
+    add_origin = False if params.get("noorigins", "0")[0] == "1" else True
     add_fakes = False if params.get("nofakes", "0")[0] == "1" else True
     add_fake_null = False if params.get("nonull", "0")[0] == "1" else True
+    add_refs = False if params.get("norefs", "0")[0] == "1" else True
     if session.node != xtdb_node:
         session.connect(xtdb_node)
-    new_elements = session.elements(add_fakes, add_fake_null)
+    new_elements = session.elements(add_origin, add_fakes, add_fake_null, add_refs)
     curdict = {
         element["data"]["info"]["xt/id"]: element for element in current_elements
     }
@@ -446,14 +498,18 @@ def display_info(node_info, edge_info, profile_style):
         if edge_info[0]["parameter"]:
             if "display" in retval3:
                 retval3.pop("display")
-            retval2 = "\n" + json.dumps(edge_info[0]["parameter"], sort_keys=True, indent=2)
+            retval2 = "\n" + json.dumps(
+                edge_info[0]["parameter"], sort_keys=True, indent=2
+            )
         if retval1 == REGISTER:
             data = session.client.history(edge_info[0]["info"]["xt/id"], True, True)
             retval1 = json.dumps(data, sort_keys=True, indent=2)
             if edge_info[0]["parameter"]:
                 if "display" in retval3:
                     retval3.pop("display")
-                data = session.client.history(edge_info[0]["parameter"]["xt/id"], True, True)
+                data = session.client.history(
+                    edge_info[0]["parameter"]["xt/id"], True, True
+                )
                 retval2 = "\n" + json.dumps(data, sort_keys=True, indent=2)
 
     REGISTER = retval1
