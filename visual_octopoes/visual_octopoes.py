@@ -132,7 +132,7 @@ class XTDBSession:
                         {
                             key: ooi[key]
                             for key in set(ooi.keys()) - {"xt/id"}
-                            if ooi[key] in xtids and ooi[key] != ooi["xt/id"]
+                            if str(ooi[key]) in xtids and ooi[key] != ooi["xt/id"]
                         },
                     )
                     for ooi in oois
