@@ -426,7 +426,7 @@ def update_graph(_, search, value, current_elements):
         if session.valid_time != new_time:
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
-    xtdb_node = params.get("node", session.node)[0]
+    xtdb_node = params.get("node", [session.node])[0]
     add_origin = False if params.get("noorigins", "0")[0] == "1" else True
     add_fakes = False if params.get("nofakes", "0")[0] == "1" else True
     add_fake_null = False if params.get("nonull", "0")[0] == "1" else True
