@@ -17,6 +17,7 @@ cyto.load_extra_layouts()
 
 
 DEFAULT_XTDB_NODE = "0"
+DEFAULT_XTDB_URL = "http://localhost:3000"
 
 
 def colorize(a: str) -> str:
@@ -29,17 +30,20 @@ class XTDBSession:
     def __init__(
         windows95,
         xtdb_node: str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XTDB_NODE,
+        xtdb_url: str = sys.argv[2] if len(sys.argv) > 1 else DEFAULT_XTDB_URL,
     ):
-        windows95.connect(xtdb_node)
+        windows95.connect(xtdb_node, xtdb_url)
         windows95.valid_time: datetime = datetime.now(timezone.utc)
 
     def connect(
         windows95,
         xtdb_node: str,
+        xtdb_url: str,
     ) -> None:
         windows95.node: str = xtdb_node
+        windows95.url: str = xtdb_url
         windows95.client: XTDBClient = XTDBClient(
-            "http://localhost:3000",
+            xtdb_url,
             xtdb_node,
             7200,
         )
@@ -64,7 +68,9 @@ class XTDBSession:
                         "info": status
                         | {
                             "node": windows95.node,
+                            "url": windows95.url,
                             "default_node": DEFAULT_XTDB_NODE,
+                            "default_url": DEFAULT_XTDB_URL,
                             "xt/id": "error",
                         },
                         "profile": "undifined",
@@ -427,12 +433,15 @@ def update_graph(_, search, value, current_elements):
             session.valid_time = new_time
     params = urllib.parse.parse_qs(search.lstrip("?"))
     xtdb_node = params.get("node", [session.node])[0]
+    xtdb_url = params.get("url", [session.url])[0]
     add_origin = False if params.get("noorigins", "0")[0] == "1" else True
     add_fakes = False if params.get("nofakes", "0")[0] == "1" else True
     add_fake_null = False if params.get("nonull", "0")[0] == "1" else True
     add_refs = False if params.get("norefs", "0")[0] == "1" else True
     if session.node != xtdb_node:
-        session.connect(xtdb_node)
+        session.connect(xtdb_node, xtdb_url)
+    if session.url != xtdb_url:
+        session.connect(xtdb_node, xtdb_url)
     new_elements = session.elements(add_origin, add_fakes, add_fake_null, add_refs)
     curdict = {
         element["data"]["info"]["xt/id"]: element for element in current_elements
