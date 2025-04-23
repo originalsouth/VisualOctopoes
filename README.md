@@ -26,7 +26,7 @@ VisualOctopoesStudio takes the following URL parameters:
 | Parameter name | Description                              | Values     | Default               | Example                   |
 |:---------------|:-----------------------------------------|:-----------|:----------------------|:--------------------------|
 |`node`          |XTDB Node                                 | string     |`0`                    |`node=0`                   |
-|`node`          |XTDB URL                                  | string     |`http://localhost:3000`|`url=http://localhost:3000`|
+|`url`          |XTDB URL                                  | string     |`http://localhost:3000`|`url=http://localhost:3000`|
 |`nonull`        |Hide NULL node                            | `1` or `0` |`0`                    |`nonull=0`                 |
 |`nofakes`       |Hide fake (implied but not present) nodes | `1` or `0` |`0`                    |`nofakes=0`                |
 |`norefs`        |Hide OOI references                       | `1` or `0` |`0`                    |`norefs=0`                 |
