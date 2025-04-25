@@ -422,7 +422,6 @@ ELEMENT_CACHE = []
     Input("cytoscape", "elements"),
 )
 def update_graph(_, search, value, current_elements):
-    global session
     session.valid_time = datetime.now(timezone.utc)
     if value:
         try:
@@ -484,7 +483,6 @@ REGISTER = "Press a node or edge for content info"
 )
 def display_info(node_info, edge_info, profile_style):
     global REGISTER
-    global session
     retval1 = "Press a node or edge for content info"
     retval2 = None
     retval3 = {**profile_style, "display": "none"}
